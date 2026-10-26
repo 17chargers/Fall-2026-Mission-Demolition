@@ -74,4 +74,14 @@ public class Projectile : MonoBehaviour
             Destroy( p.gameObject );
         }
     }
+
+    // Returns true once every Projectile has stopped moving (or fallen off the world)
+    static public bool ALL_ASLEEP()
+    {
+        foreach ( Projectile p in PROJECTILES )
+        {
+            if ( p.awake && p.transform.position.y > -50 ) return false;
+        }
+        return true;
+    }
 }

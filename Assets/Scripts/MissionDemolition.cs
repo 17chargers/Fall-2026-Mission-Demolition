@@ -7,7 +7,8 @@ public enum GameMode
 {
     idle,
     playing,
-    levelEnd
+    levelEnd,
+    gameOver
 }
 
 public class MissionDemolition : MonoBehaviour
@@ -19,11 +20,20 @@ public class MissionDemolition : MonoBehaviour
     public Text         uitShots;   //The UIText_Shots text
     public Vector3      castlePos;  //The place to put castles
     public GameObject[] castles;    //An array of the castles
+    public GameObject   gameOverPanel;      //The GameOverPanel UI object
+    public int          shotsPerLevel = 5;  //Shots allowed before game over
+    public Text         uitStars;           //The UIText_Stars text
+    public int          threeStarShots = 2; //Win in this many shots or fewer for 3 stars
+    public int          twoStarShots = 4;   //Win in this many shots or fewer for 2 stars
+    public GameObject   winPanel;           //The WinPanel UI object
+    public Text         uitWin;             //The UIText_Win text on the WinPanel
 
     [Header("Dynamic")]
     public int          level;      //The current level
     public int          levelMax;   //The number of levels
     public int          shotsTaken;
+    public int          shotsThisLevel;     //Shots used on the current level
+    public int          totalStars;         //Stars earned across all levels
     public GameObject   castle;     //The current castle
     public GameMode     mode = GameMode.idle;
     public string       showing = "Show Slingshot"; //FollowCam mode
@@ -34,7 +44,10 @@ public class MissionDemolition : MonoBehaviour
 
         level = 0;
         shotsTaken = 0;
+        totalStars = 0;
         levelMax = castles.Length;
+        gameOverPanel.SetActive(false);
+        winPanel.SetActive(false);
         StartLevel();
     }
 
@@ -53,8 +66,12 @@ public class MissionDemolition : MonoBehaviour
         castle = Instantiate<GameObject>( castles[level] );
         castle.transform.position = castlePos;
 
-        // Reset the goal
+        // Reset the goal and this level's shot count
         Goal.goalMet = false;
+        shotsThisLevel = 0;
+
+        // Hide the star rating until the level is won
+        uitStars.enabled = false;
 
         UpdateGUI();
 
@@ -68,7 +85,7 @@ public class MissionDemolition : MonoBehaviour
     {
         //Show the data in the GITexts
         uitLevel.text = "Level: " +(level+1)+" of " +levelMax;
-        uitShots.text = "Shots Taken: "+shotsTaken;        
+        uitShots.text = "Shots Taken: "+shotsTaken+"  ("+(shotsPerLevel-shotsThisLevel)+" left)";
     }
 
     void Update()
@@ -83,9 +100,59 @@ public class MissionDemolition : MonoBehaviour
 
             //Zoom out to show both
             FollowCam.SWITCH_VIEW( FollowCam.eView.both );
-            //Start the next level in 2 seconds
-            Invoke("NextLevel", 2f);
+
+            //Show how many stars this level earned
+            int stars = GetStars();
+            totalStars += stars;
+            uitStars.text = "Level Complete!\n" + stars + " / 3 Stars";
+            uitStars.enabled = true;
+
+            if (level == levelMax - 1)
+            {
+                //That was the last level, so show the win screen in 3 seconds
+                Invoke("ShowWinScreen", 3f);
+            }
+            else
+            {
+                //Start the next level in 3 seconds (a little longer so you can see the stars)
+                Invoke("NextLevel", 3f);
+            }
         }
+
+        //Out of shots and the last one has stopped without reaching the goal
+        if ( (mode == GameMode.playing) && (shotsThisLevel >= shotsPerLevel) && Projectile.ALL_ASLEEP() )
+        {
+            mode = GameMode.gameOver;
+            FollowCam.SWITCH_VIEW( FollowCam.eView.both );
+            gameOverPanel.SetActive(true);
+        }
+    }
+
+    //Fewer shots = more stars
+    int GetStars()
+    {
+        if (shotsThisLevel <= threeStarShots) return 3;
+        if (shotsThisLevel <= twoStarShots) return 2;
+        return 1;
+    }
+
+    void ShowWinScreen()
+    {
+        uitStars.enabled = false;
+        //3 stars are possible on each level, so 4 levels = 12
+        uitWin.text = "Congratulations! You win!\nYou got " + totalStars + " / " + (levelMax * 3) + " stars!!";
+        winPanel.SetActive(true);
+    }
+
+    //Called by the Play Again button and the Go Again? button
+    public void PlayAgain()
+    {
+        gameOverPanel.SetActive(false);
+        winPanel.SetActive(false);
+        level = 0;
+        shotsTaken = 0;
+        totalStars = 0;
+        StartLevel();
     }
 
     void NextLevel()
@@ -103,6 +170,13 @@ public class MissionDemolition : MonoBehaviour
     static public void SHOT_FIRED()
     {
         S.shotsTaken++;
+        S.shotsThisLevel++;
+    }
+
+    //Static method that lets the Slingshot know if a shot is allowed right now
+    static public bool CAN_SHOOT()
+    {
+        return (S.mode == GameMode.playing) && (S.shotsThisLevel < S.shotsPerLevel);
     }
 
     // Static method that allows code anywhere to get a reference to S.castle
