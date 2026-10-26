@@ -7,6 +7,7 @@ public class Slingshot : MonoBehaviour
     [Header("Set in Inspector")]
     public GameObject prefabProjectile;
     public float velocityMult = 8f;
+    public GameObject projLinePrefab;
 
     [Header("Set Dynamically")]
     public GameObject launchPoint;
@@ -54,8 +55,15 @@ public class Slingshot : MonoBehaviour
             aimingMode = false;
             projectileRigidbody.isKinematic = false;
             projectileRigidbody.velocity = mouseDelta * velocityMult;
+
+            //Switch to slingshot view immediately before setting POI
+            FollowCam.SWITCH_VIEW( FollowCam.eView.slingshot );
+
             FollowCam.POI = projectile;
+            //Add a ProjectileLine to the Projectile
+            Instantiate<GameObject>(projLinePrefab, projectile.transform);
             projectile = null;
+            MissionDemolition.SHOT_FIRED();
         }
 
     }
